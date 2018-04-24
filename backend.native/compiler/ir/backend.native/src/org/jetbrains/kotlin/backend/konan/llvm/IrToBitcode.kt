@@ -1998,21 +1998,22 @@ internal class CodeGeneratorVisitor(val context: Context, val lifetimes: Map<IrE
     //-------------------------------------------------------------------------//
 
     private fun evaluatePrivateFunctionCall(callee: IrPrivateFunctionCall, args: List<LLVMValueRef>, resultLifetime: Lifetime): LLVMValueRef {
-        val functionsListName = callee.moduleDescriptor.privateFunctionsTableSymbolName
+        val dfgSymbol = callee.dfgSymbol
+        val moduleDescriptor = dfgSymbol.module.descriptor
+        val functionsListName = moduleDescriptor.privateFunctionsTableSymbolName
         // LLVM inlines access to this global array (with -opt option on).
         val functionsList =
-                if (callee.moduleDescriptor == context.irModule!!.descriptor)
+                if (moduleDescriptor == context.irModule!!.descriptor)
                     LLVMGetNamedGlobal(context.llvmModule, functionsListName)
                 else
-                    codegen.importGlobal(functionsListName, LLVMArrayType(int8TypePtr, callee.totalFunctions)!!, callee.moduleDescriptor.llvmSymbolOrigin)
-        val functionIndex    = Int32(callee.functionIndex).llvm
+                    codegen.importGlobal(functionsListName, LLVMArrayType(int8TypePtr, dfgSymbol.module.numberOfFunctions)!!, moduleDescriptor.llvmSymbolOrigin)
+        val functionIndex    = Int32(dfgSymbol.symbolTableIndex).llvm
         val functionPlacePtr = LLVMBuildGEP(functionGenerationContext.builder, functionsList, cValuesOf(kImmZero, functionIndex), 2, "")!!
         val functionPtr      = functionGenerationContext.load(functionPlacePtr)
 
-        val target = callee.symbol.owner as IrFunction
-        val functionPtrType  = pointerType(codegen.getLlvmFunctionType(target))
+        val functionPtrType  = pointerType(codegen.getLlvmFunctionType(dfgSymbol))
         val function         = functionGenerationContext.bitcast(functionPtrType, functionPtr)
-        return call(target, function, args, resultLifetime)
+        return call(callee.symbol.owner as IrFunction, function, args, resultLifetime)
     }
 
     //-------------------------------------------------------------------------//
