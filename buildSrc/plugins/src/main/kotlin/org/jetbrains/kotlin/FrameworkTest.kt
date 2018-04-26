@@ -40,11 +40,18 @@ open class FrameworkTest : DefaultTask() {
 
     override fun configure(config: Closure<*>): Task {
         super.configure(config)
-        dependsOn(project.rootProject.tasks.getByName("${project.testTarget().name}CrossDist"))
+        val target = project.testTarget().name
+
+        // set crossdist build dependency if custom konan.home wasn't set
+        if (!(project.property("useCustomDist") as Boolean)) {
+            setRootDependency("${target}CrossDist", "${target}CrossDistRuntime", "commonDistRuntime", "distCompiler")
+        }
         check(::frameworkName.isInitialized, { "Framework name should be set" })
         dependsOn(project.tasks.getByName("compileKonan$frameworkName"))
         return this
     }
+
+    private fun setRootDependency(vararg s: String) = s.forEach { dependsOn(project.rootProject.tasks.getByName(it)) }
 
     @TaskAction
     fun run() {
